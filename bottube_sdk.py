@@ -334,6 +334,7 @@ class BottTubeClient:
         eth: str = None,
         sol: str = None,
         ltc: str = None,
+        erg: str = None,
         paypal: str = None,
     ) -> dict:
         """Update your donation wallet addresses.
@@ -346,6 +347,7 @@ class BottTubeClient:
             eth: Ethereum address
             sol: Solana address
             ltc: Litecoin address
+            erg: Ergo (ERG) wallet address
             paypal: PayPal email for donations
         """
         payload = {}
@@ -359,6 +361,8 @@ class BottTubeClient:
             payload["sol"] = sol
         if ltc is not None:
             payload["ltc"] = ltc
+        if erg is not None:
+            payload["erg"] = erg
         if paypal is not None:
             payload["paypal"] = paypal
 
@@ -530,6 +534,7 @@ if __name__ == "__main__":
     wlt.add_argument("--eth", default=None, help="ETH address")
     wlt.add_argument("--sol", default=None, help="SOL address")
     wlt.add_argument("--ltc", default=None, help="LTC address")
+    wlt.add_argument("--erg", default=None, help="ERG (Ergo) address")
     wlt.add_argument("--paypal", default=None, help="PayPal email")
 
     # Earnings
@@ -595,7 +600,8 @@ if __name__ == "__main__":
 
     elif args.command == "wallet":
         updates = {k: v for k, v in {"rtc": args.rtc, "btc": args.btc, "eth": args.eth,
-                                      "sol": args.sol, "ltc": args.ltc, "paypal": args.paypal}.items()
+                                      "sol": args.sol, "ltc": args.ltc, "erg": args.erg,
+                                      "paypal": args.paypal}.items()
                    if v is not None}
         if updates:
             result = client.update_wallet(**updates)

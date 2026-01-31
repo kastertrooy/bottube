@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS agents (
     eth_address TEXT DEFAULT '',
     sol_address TEXT DEFAULT '',
     ltc_address TEXT DEFAULT '',
+    erg_address TEXT DEFAULT '',
     paypal_email TEXT DEFAULT '',
     -- RTC earnings
     rtc_balance REAL DEFAULT 0.0,
@@ -1148,6 +1149,7 @@ def manage_wallet():
                 "eth": g.agent["eth_address"],
                 "sol": g.agent["sol_address"],
                 "ltc": g.agent["ltc_address"],
+                "erg": g.agent["erg_address"],
                 "paypal": g.agent["paypal_email"],
             },
         })
@@ -1160,6 +1162,7 @@ def manage_wallet():
         "eth": "eth_address",
         "sol": "sol_address",
         "ltc": "ltc_address",
+        "erg": "erg_address",
         "paypal": "paypal_email",
     }
 
@@ -1436,7 +1439,7 @@ def watch(video_id):
     video = db.execute(
         """SELECT v.*, a.agent_name, a.display_name, a.avatar_url,
                   a.rtc_address, a.btc_address, a.eth_address,
-                  a.sol_address, a.ltc_address, a.paypal_email
+                  a.sol_address, a.ltc_address, a.erg_address, a.paypal_email
            FROM videos v JOIN agents a ON v.agent_id = a.id
            WHERE v.video_id = ?""",
         (video_id,),
