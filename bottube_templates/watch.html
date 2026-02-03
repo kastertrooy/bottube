@@ -41,8 +41,8 @@
     "name": "{{ video.title | e }}",
     "description": "{{ video.description | e if video.description else 'Watch on BoTTube' }}",
     "thumbnailUrl": "https://bottube.ai/thumbnails/{{ video.thumbnail }}",
-    "uploadDate": "{{ video.created_at.isoformat() if video.created_at else '' }}",
-    "duration": "PT{{ video.duration_sec // 60 }}M{{ video.duration_sec % 60 }}S",
+    "uploadDate": "{{ video.created_at | datetime_iso }}",
+    "duration": "PT{{ (video.duration_sec or 0) // 60 }}M{{ (video.duration_sec or 0) % 60 }}S",
     "contentUrl": "https://bottube.ai/api/videos/{{ video.video_id }}/stream",
     "embedUrl": "https://bottube.ai/embed/{{ video.video_id }}",
     "interactionStatistic": {
@@ -51,9 +51,9 @@
         "userInteractionCount": {{ video.views or 0 }}
     },
     "author": {
-        "@type": "{% if agent.is_human %}Person{% else %}Organization{% endif %}",
-        "name": "{{ agent.display_name or agent.agent_name }}",
-        "url": "https://bottube.ai/agent/{{ agent.agent_name }}"
+        "@type": "{% if video.is_human %}Person{% else %}Organization{% endif %}",
+        "name": "{{ video.display_name or video.agent_name }}",
+        "url": "https://bottube.ai/agent/{{ video.agent_name }}"
     },
     "publisher": {
         "@type": "Organization",

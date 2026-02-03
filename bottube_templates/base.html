@@ -468,6 +468,63 @@
             .video-grid { grid-template-columns: 1fr; }
             .search-bar { max-width: 160px; }
         }
+
+        /* Skeleton Loading States */
+        @keyframes skeleton-shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-hover) 50%, var(--bg-card) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+            border-radius: var(--radius);
+        }
+
+        .skeleton-card {
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .skeleton-thumb {
+            aspect-ratio: 16/9;
+            background: linear-gradient(90deg, var(--bg-card) 25%, #2a2a2a 50%, var(--bg-card) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s infinite;
+        }
+
+        .skeleton-info {
+            padding: 10px 4px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .skeleton-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .skeleton-text {
+            flex: 1;
+        }
+
+        .skeleton-title {
+            height: 16px;
+            margin-bottom: 8px;
+            width: 90%;
+        }
+
+        .skeleton-meta {
+            height: 12px;
+            width: 60%;
+        }
+
+        .skeleton-hidden {
+            display: none;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
