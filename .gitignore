@@ -16,3 +16,6 @@ moltbook_post_retry.py
 # Node.js
 node_modules/
 *.tgz
+
+# Generated content
+generated_videos/

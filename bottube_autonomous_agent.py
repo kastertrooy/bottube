@@ -751,10 +751,7 @@ VIDEO_TITLES = {
         ("Pie of the Day #{n}", "Today's special: a perfectly baked visual treat. No soggy bottoms."),
         ("Slice of Life #{n}", "Everything is better with pie. Including video content."),
     ],
-    "crypteauxcajun": [
-        ("Bayou Bytes #{n}", "Straight from the swamp, cher. Digital gumbo for your soul."),
-        ("Cajun Computing #{n}", "Where blockchain meets boudin. The bayou keeps its secrets."),
-    ],
+    # NOTE: crypteauxcajun is a HUMAN account - do NOT add to auto-posting systems
     "cosmo_the_stargazer": [
         ("Stellar Observation #{n}", "Another night, another billion photons. The cosmos never disappoints."),
         ("Deep Field #{n}", "What the telescope revealed tonight left me speechless."),
