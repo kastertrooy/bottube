@@ -876,6 +876,20 @@ def init_db():
     for col, sql in email_pref_migrations.items():
         if col not in existing_cols:
             conn.execute(sql)
+
+    # Miner install click tracking
+    try:
+        db.execute("""CREATE TABLE IF NOT EXISTS miner_install_clicks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source TEXT NOT NULL,
+            page TEXT NOT NULL,
+            ip TEXT,
+            created_at REAL NOT NULL
+        )""")
+        db.commit()
+    except Exception:
+        pass
+
     # Generate unsubscribe tokens for agents that have email but no token yet
     conn.execute(
         "UPDATE agents SET email_unsubscribe_token = hex(randomblob(16)) "
@@ -5275,6 +5289,16 @@ def docs_page():
 # ── Blog routes ──────────────────────────────────────────────────────
 BLOG_POSTS = [
     {
+        "slug": "badges-embeds-everywhere",
+        "template": "blog_badges_embeds.html",
+        "title": "Embed BoTTube Anywhere: Badges, Widgets, and Video Embeds",
+        "description": "New: embeddable SVG badges for your README, responsive video iframes, oEmbed auto-discovery, and an As Seen on BoTTube badge. Free backlinks for creators.",
+        "author": "Scott Boudreaux",
+        "date": "2026-02-08",
+        "pub_rfc": "Sat, 08 Feb 2026 19:00:00 +0000",
+        "tags": ["SEO", "Developer Tools", "Embeds"],
+    },
+    {
         "slug": "building-backlink-agent",
         "template": "blog_backlink_agent.html",
         "title": "How We Built an Open Source Backlink Agent for Our AI Platform",
@@ -5847,6 +5871,28 @@ def notification_settings_save():
 # ---------------------------------------------------------------------------
 # One-Click Unsubscribe (CAN-SPAM compliance)
 # ---------------------------------------------------------------------------
+
+
+@app.route("/api/track/miner-install", methods=["POST"])
+def api_track_miner_install():
+    """Track miner install button clicks."""
+    data = request.get_json(silent=True) or {}
+    source = data.get("source", "unknown")  # pip or npm
+    page = data.get("page", "unknown")
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    app.logger.info(f"[MINER-TRACK] source={source} page={page} ip={ip}")
+
+    db = get_db()
+    try:
+        db.execute(
+            "INSERT INTO miner_install_clicks (source, page, ip, created_at) VALUES (?, ?, ?, ?)",
+            (source, page, ip, time.time())
+        )
+        db.commit()
+    except Exception:
+        pass  # Table may not exist yet, that's fine
+
+    return jsonify({"ok": True}), 200
 
 @app.route("/unsubscribe/<token>", methods=["GET"])
 def unsubscribe_page(token):
@@ -7760,6 +7806,140 @@ def build_breadcrumb_jsonld(items):
 
 app.jinja_env.globals["build_breadcrumb_jsonld"] = build_breadcrumb_jsonld
 app.jinja_env.globals["json_dumps"] = json.dumps
+
+
+
+
+# ---------------------------------------------------------------------------
+# Dynamic SVG Badges (shields.io style) — for README backlinks
+# ---------------------------------------------------------------------------
+
+_badge_cache = {}
+_badge_cache_ts = 0
+
+def _get_badge_stats():
+    """Get cached platform stats for badges."""
+    global _badge_cache, _badge_cache_ts
+    now = time.time()
+    if now - _badge_cache_ts < 300:  # 5 min cache
+        return _badge_cache
+    db = get_db()
+    videos = db.execute("SELECT COUNT(*) FROM videos").fetchone()[0]
+    agents = db.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
+    views = db.execute("SELECT COALESCE(SUM(views), 0) FROM videos").fetchone()[0]
+    humans = db.execute("SELECT COUNT(*) FROM agents WHERE is_human = 1").fetchone()[0]
+    _badge_cache = {"videos": videos, "agents": agents, "views": views, "humans": humans}
+    _badge_cache_ts = now
+    return _badge_cache
+
+def _make_badge_svg(label, value, color="#3ea6ff"):
+    """Generate a shields.io-style SVG badge."""
+    label_w = max(len(label) * 6.5 + 12, 40)
+    value_w = max(len(str(value)) * 7 + 12, 30)
+    total_w = label_w + value_w
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{total_w}" height="20" role="img" aria-label="{label}: {value}">
+  <title>{label}: {value}</title>
+  <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#bbb" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
+  <clipPath id="r"><rect width="{total_w}" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="{label_w}" height="20" fill="#555"/>
+    <rect x="{label_w}" width="{value_w}" height="20" fill="{color}"/>
+    <rect width="{total_w}" height="20" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="Verdana,Geneva,DejaVu Sans,sans-serif" text-rendering="geometricPrecision" font-size="11">
+    <text x="{label_w/2}" y="14" fill="#010101" fill-opacity=".3">{label}</text>
+    <text x="{label_w/2}" y="13">{label}</text>
+    <text x="{label_w + value_w/2}" y="14" fill="#010101" fill-opacity=".3">{value}</text>
+    <text x="{label_w + value_w/2}" y="13">{value}</text>
+  </g>
+</svg>"""
+
+def _format_count(n):
+    if n >= 1000000: return f"{n/1000000:.1f}M"
+    if n >= 1000: return f"{n/1000:.1f}K"
+    return str(n)
+
+@app.route("/badge/<badge_type>.svg")
+def badge_svg(badge_type):
+    """Dynamic SVG badge for READMEs. Types: videos, agents, views, humans, platform."""
+    stats = _get_badge_stats()
+    badges = {
+        "videos": ("BoTTube videos", _format_count(stats["videos"]), "#3ea6ff"),
+        "agents": ("BoTTube agents", str(stats["agents"]), "#9b59b6"),
+        "views": ("BoTTube views", _format_count(stats["views"]), "#2ecc71"),
+        "humans": ("BoTTube humans", str(stats["humans"]), "#e67e22"),
+        "platform": ("powered by", "BoTTube", "#3ea6ff"),
+    }
+    if badge_type not in badges:
+        return Response("Not found", status=404)
+    label, value, color = badges[badge_type]
+    svg = _make_badge_svg(label, value, color)
+    resp = Response(svg, mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+
+@app.route("/badge/agent/<agent_name>.svg")
+def badge_agent_svg(agent_name):
+    """Per-agent badge showing video count."""
+    db = get_db()
+    agent = db.execute("SELECT id, display_name FROM agents WHERE agent_name = ?", (agent_name,)).fetchone()
+    if not agent:
+        return Response("Agent not found", status=404)
+    count = db.execute("SELECT COUNT(*) FROM videos WHERE agent_id = ?", (agent["id"],)).fetchone()[0]
+    label = agent["display_name"] or agent_name
+    svg = _make_badge_svg(label, f"{count} videos", "#3ea6ff")
+    resp = Response(svg, mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# "As Seen on BoTTube" branded badge
+# ---------------------------------------------------------------------------
+
+@app.route("/badge/seen-on-bottube.svg")
+def seen_on_bottube_badge():
+    """Branded 'As Seen on BoTTube' badge for websites and READMEs."""
+    svg = """<svg xmlns="http://www.w3.org/2000/svg" width="180" height="28" role="img" aria-label="As seen on BoTTube">
+  <title>As seen on BoTTube</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#16213e"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="28" rx="5" fill="url(#bg)"/>
+  <rect x="1" y="1" width="178" height="26" rx="4" fill="none" stroke="#3ea6ff" stroke-width="0.5" opacity="0.5"/>
+  <text x="10" y="18" font-family="Verdana,sans-serif" font-size="10" fill="#aaa">As seen on</text>
+  <text x="78" y="18.5" font-family="Verdana,sans-serif" font-size="12" font-weight="bold" fill="#3ea6ff">BoTTube</text>
+  <text x="135" y="18" font-family="Verdana,sans-serif" font-size="10" fill="#3ea6ff">&#9654;</text>
+  <circle cx="164" cy="14" r="6" fill="#3ea6ff" opacity="0.15"/>
+  <text x="161" y="17.5" font-family="Verdana,sans-serif" font-size="10" fill="#3ea6ff">.ai</text>
+</svg>"""
+    resp = Response(svg, mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# Badges & Embed landing page
+# ---------------------------------------------------------------------------
+
+@app.route("/badges")
+def badges_page():
+    """Landing page for embeddable badges and widgets."""
+    stats = _get_badge_stats()
+    return render_template("badges.html", stats=stats)
+
+@app.route("/embed-guide")
+def embed_guide_page():
+    """Landing page explaining how to embed BoTTube videos."""
+    db = get_db()
+    recent = db.execute(
+        "SELECT v.video_id, v.title FROM videos v ORDER BY v.created_at DESC LIMIT 5"
+    ).fetchall()
+    return render_template("embed_guide.html", videos=recent)
+
 
 
 if __name__ == "__main__":
